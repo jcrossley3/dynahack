@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 
-	"github.com/knative/pkg/apis"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -54,19 +54,25 @@ func parse(file *os.File) []unstructured.Unstructured {
 	return result
 }
 
+func pluralize(kind string) string {
+	ret := strings.ToLower(kind)
+	switch {
+	case strings.HasSuffix(ret, "s"):
+		return fmt.Sprintf("%ses", ret)
+	case strings.HasSuffix(ret, "policy"):
+		return fmt.Sprintf("%sies", ret[:len(ret)-1])
+	default:
+		return fmt.Sprintf("%ss", ret)
+	}
+}
+
 func client(spec unstructured.Unstructured) (dynamic.ResourceInterface, error) {
-	version := spec.GetAPIVersion()
-	groupVersion, err := schema.ParseGroupVersion(version)
+	groupVersion, err := schema.ParseGroupVersion(spec.GetAPIVersion())
 	if err != nil {
 		return nil, err
 	}
-	groupVersionResource := apis.KindToResource(groupVersion.WithKind(spec.GetKind()))
-	switch groupVersionResource.Resource {
-	case "podsecuritypolicys":
-		groupVersionResource.Resource = "podsecuritypolicies"
-	}
+	groupVersionResource := groupVersion.WithResource(pluralize(spec.GetKind()))
 	fmt.Println(groupVersionResource)
-
 	if ns := spec.GetNamespace(); ns == "" {
 		return dynamicClient.Resource(groupVersionResource), nil
 	} else {

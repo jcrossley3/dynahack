@@ -29,17 +29,11 @@
   go-tests = true
   unused-packages = true
 
-[[override]]
-  name = "k8s.io/apimachinery"
-  # revision for tag "kubernetes-1.13.1"
-  revision = "2b1284ed4c93a43499e781493253e2ac5959c4fd"
-
-[[override]]
+[[constraint]]
+  branch = "master"
   name = "k8s.io/client-go"
-  # revision for tag "kubernetes-1.13.1"
-  revision = "8d9ed539ba3134352c586810e749e58df4e94e4f"
 
 [[constraint]]
   branch = "master"
-  name = "github.com/knative/pkg"
+  name = "k8s.io/apimachinery"
 
