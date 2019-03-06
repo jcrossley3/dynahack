@@ -31,8 +31,22 @@ func buffer(file *os.File) []byte {
 	return make([]byte, size)
 }
 
-func parse(file *os.File) []unstructured.Unstructured {
-	result := []unstructured.Unstructured{}
+func decode(in chan []byte, out chan unstructured.Unstructured) {
+	for buf := range in {
+		spec := unstructured.Unstructured{}
+		err := yaml.NewYAMLToJSONDecoder(bytes.NewReader(buf)).Decode(&spec)
+		if err != nil {
+			if err != io.EOF {
+				fmt.Println("ERROR", spec.GetName(), err)
+			}
+			continue
+		}
+		out <- spec
+	}
+	close(out)
+}
+
+func read(file *os.File, sink chan []byte) {
 	buf := buffer(file)
 	manifests := yaml.NewDocumentDecoder(file)
 	defer manifests.Close()
@@ -41,14 +55,19 @@ func parse(file *os.File) []unstructured.Unstructured {
 		if err == io.EOF {
 			break
 		}
-		spec := unstructured.Unstructured{}
-		err = yaml.NewYAMLToJSONDecoder(bytes.NewReader(buf[:size])).Decode(&spec)
-		if err != nil {
-			if err != io.EOF {
-				fmt.Println("ERROR", spec.GetName(), err)
-			}
-			continue
-		}
+		b := make([]byte, size)
+		copy(b, buf)
+		sink <- b
+	}
+	close(sink)
+}
+
+func parse(file *os.File) []unstructured.Unstructured {
+	in, out := make(chan []byte, 10), make(chan unstructured.Unstructured, 10)
+	go read(file, in)
+	go decode(in, out)
+	result := []unstructured.Unstructured{}
+	for spec := range out {
 		result = append(result, spec)
 	}
 	return result
